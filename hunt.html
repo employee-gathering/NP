@@ -49,12 +49,21 @@ async function join(code){teamCode=String(code||'').trim().toUpperCase();if(!tea
  localStorage.setItem('ih_team_code',teamCode);showGame(true);await refresh();await handleQr();
  }catch(e){$('loginMsg').textContent='Gagal terhubung: '+e.message}}
 async function handleQr(){
- const url=new URL(location.href),token=url.searchParams.get('qr');if(!token)return;
- if(!teamCode){showGame(false);$('loginMsg').textContent='Masukkan kode tim terlebih dahulu, lalu buka kembali QR yang dipindai.';return}
- try{message('QR terbaca. Memproses misi...');const result=await rpc('ih_scan_qr',{p_team_code:teamCode,p_token:token});
- message(result?.message||'QR diproses.');if(result?.code==='player_ok')message('Warna '+result.color_code+': cari wahana '+result.ride_name+'.');if(result?.code==='ride_ok')message('Berhasil! Huruf '+result.letter+' untuk warna '+result.color_code+' sudah didapat.');await refresh();
- }catch(e){message('Gagal memproses QR: '+e.message)}
- url.searchParams.delete('qr');history.replaceState({},'',url.pathname+(url.search?url.search:'')+url.hash);
+ if(!pendingQr)return;
+ if(!teamCode){showGame(false);$('loginMsg').textContent='QR sudah terbaca. Masukkan kode tim untuk melanjutkan; QR akan diproses otomatis setelah masuk.';return}
+ const token=pendingQr;
+ try{
+  message('QR terbaca. Memproses misi...');
+  const result=await rpc('ih_scan_qr',{p_team_code:teamCode,p_token:token});
+  if(result?.ok===false){message(result.message||'QR tidak dapat diproses.');}
+  else if(result?.code==='player_ok'){message('Warna '+result.color_code+': cari wahana '+result.ride_name+'.');}
+  else if(result?.code==='ride_ok'){message('Berhasil! Huruf '+result.letter+' untuk warna '+result.color_code+' sudah didapat.');}
+  else {message(result?.message||'QR diproses.');}
+  pendingQr='';
+  const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('qr');
+  history.replaceState({},'',cleanUrl.pathname+(cleanUrl.search?cleanUrl.search:'')+cleanUrl.hash);
+  await refresh();
+ }catch(e){message('Gagal memproses QR: '+e.message+' Muat ulang halaman untuk mencoba lagi.');}
 }
 $('join').onclick=()=>join($('teamCode').value);
 $('teamCode').value=teamCode;
