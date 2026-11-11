@@ -17,7 +17,7 @@
 <section id="game" class="hidden">
 <div class="card"><div class="row"><div><div class="muted">TIM KAMU</div><h2 id="teamName">—</h2><span id="teamMeta" class="tag"></span></div><button class="alt" id="changeTeam" style="max-width:120px">Ganti tim</button></div><div id="notice" class="status">Memuat status permainan...</div></div>
 <div class="card"><h2>Progres 6 Warna</h2><div class="grid" id="progress"></div></div>
-<div class="card"><h2>Kirim Jawaban Akhir</h2><p class="muted">Setelah keenam huruf terkumpul, susun nama hewan 5 huruf. Satu huruf adalah pengecoh. Pilih warna impostor.</p><input id="animal" placeholder="Nama hewan (5 huruf)" maxlength="5" autocapitalize="characters"><select id="impostor"><option value="">Pilih warna impostor</option><option>RED</option><option>BLUE</option><option>GREEN</option><option>YELLOW</option><option>PURPLE</option><option>ORANGE</option></select><button id="submit">Kirim jawaban</button><div id="answerMsg" class="status hidden"></div></div>
+<div class="card"><h2>Kirim Jawaban Akhir</h2><p class="muted">Setelah keenam huruf terkumpul, susun nama hewan 5 huruf. Satu huruf adalah pengecoh. Pilih warna impostor.</p><input id="animal" placeholder="Nama hewan (5 huruf)" maxlength="5" autocapitalize="characters"><select id="impostor"><option value="">Pilih warna impostor</option><option>RED</option><option>BLUE</option><option>GREEN</option><option>YELLOW</option><option>PURPLE</option><option>ORANGE</option></select><button id="submit" disabled>Kirim jawaban</button><div id="answerMsg" class="status hidden"></div></div>
 <div class="card"><h2>Cara bermain</h2><ol class="muted"><li>Scan QR pemain berkostum untuk mendapatkan petunjuk wahana.</li><li>Datangi wahana yang disebutkan, lalu scan QR wahana.</li><li>Jika benar, satu huruf akan masuk ke progres tim.</li><li>Ulangi sampai enam warna selesai, lalu kirim jawaban.</li></ol></div>
 </section>
 <div class="footer">Employee Gathering · Impostor Hunt</div></main>
@@ -26,7 +26,7 @@ const SUPABASE_URL='https://mnxnyasnmtgkmlhcqhys.supabase.co';
 const SUPABASE_KEY='sb_publishable_ZyLReVa5vQSf8uKvgj1kaA_ZN1oInWT';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=id=>document.getElementById(id);
-let teamCode=localStorage.getItem('ih_team_code')||'';
+let teamCode=localStorage.getItem('ih_team_code')||'';\nlet pendingQr=new URL(location.href).searchParams.get('qr')||'';\nlet refreshTimer=null;
 const colors=['RED','BLUE','GREEN','YELLOW','PURPLE','ORANGE'];
 function message(text){$('notice').textContent=text}
 function showGame(on){$('login').classList.toggle('hidden',on);$('game').classList.toggle('hidden',!on)}
@@ -61,5 +61,5 @@ $('teamCode').value=teamCode;
 $('changeTeam').onclick=()=>{if(confirm('Ganti kode tim di perangkat ini?')){localStorage.removeItem('ih_team_code');teamCode='';showGame(false)}};
 $('submit').onclick=async()=>{const answer=$('animal').value.trim().toUpperCase(),color=$('impostor').value;if(answer.length!==5||!color){$('answerMsg').textContent='Isi nama hewan 5 huruf dan pilih warna impostor.';$('answerMsg').classList.remove('hidden');return}
  try{const result=await rpc('ih_submit_answer',{p_team_code:teamCode,p_animal_answer:answer,p_impostor_color_code:color});$('answerMsg').textContent=result?.message||'Jawaban terkirim.';$('answerMsg').classList.remove('hidden')}catch(e){$('answerMsg').textContent='Gagal mengirim: '+e.message;$('answerMsg').classList.remove('hidden')}};
-if(teamCode){showGame(true);refresh().then(handleQr).catch(e=>message('Gagal memuat: '+e.message))}else showGame(false);
+if(teamCode){showGame(true);refresh().then(handleQr).catch(e=>message('Gagal memuat: '+e.message));refreshTimer=setInterval(()=>refresh().catch(()=>{}),8000)}else{showGame(false);if(pendingQr)$('loginMsg').textContent='QR sudah terbaca. Masukkan kode tim untuk melanjutkan; QR akan diproses otomatis setelah masuk.'}
 </script></body></html>
