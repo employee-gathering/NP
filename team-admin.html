@@ -8,7 +8,7 @@
 <section id="login" class="card"><h1>Daftar Tim CIH</h1><p class="muted">Login menggunakan akun Admin Employee Gathering.</p><input id="email" type="email" placeholder="Email Admin"><input id="password" type="password" placeholder="Password Admin"><button id="loginBtn">Login</button><p id="loginMsg" class="muted"></p></section>
 <section id="app" class="hidden">
 <div class="row"><div><h1>Daftar Tim CIH</h1><p class="muted" id="who"></p></div><button id="logout">Keluar</button></div>
-<div class="card"><h2>Daftar anggota</h2><div class="row"><select id="batch"></select><select id="team"></select></div><div id="status" class="status">Memuat...</div><div class="tablewrap"><table><thead><tr><th>Nama</th><th>NID</th></tr></thead><tbody id="members"></tbody></table></div></div>
+<div class="card"><h2>Daftar anggota</h2><div class="row"><select id="batch"></select><select id="team"></select></div><div id="status" class="status">Memuat...</div><div class="tablewrap"><table><thead><tr><th>Username TIM</th><th>Nama peserta</th><th>NID</th></tr></thead><tbody id="members"></tbody></table></div></div>
 </section></main>
 <script>
 const db=supabase.createClient('https://mnxnyasnmtgkmlhcqhys.supabase.co','sb_publishable_ZyLReVa5vQSf8uKvgj1kaA_ZN1oInWT'),$=id=>document.getElementById(id);
@@ -35,14 +35,12 @@ async function loadTeams(){
 async function loadMembers(){
  const id=$('team').value;if(!id)return;
  $('status').textContent='Memuat anggota tim...';
- const {data:links,error}=await db.from('ih_team_members').select('attendee_id').eq('team_id',id);
- if(error){$('status').textContent=error.message;return}
- const ids=(links||[]).map(x=>x.attendee_id);if(!ids.length){$('members').innerHTML='';$('status').textContent='Belum ada anggota.';return}
- const {data:people,error:pe}=await db.from('attendees').select('id,full_name,nid').in('id',ids);
- if(pe){$('status').textContent=pe.message;return}
- const t=teams.find(t=>t.id===id);
- $('members').innerHTML=(people||[]).map((p,i)=>'<tr><td>'+String(t.team_code+'-M'+String(i+1).padStart(2,'0')).replace(/[&<>"]/g,'')+'</td><td>'+String(p.full_name||'').replace(/[&<>"]/g,'')+'</td><td>'+String(p.nid||'').replace(/[&<>"]/g,'')+'</td></tr>').join('');
- $('status').textContent=(people||[]).length+' anggota pada tim '+teams.find(t=>t.id===id)?.team_code+'. Roster berasal dari PEMBAGIAN TIM.xlsx.';
+ const {data:people,error}=await db.rpc('ih_admin_list_team_members',{p_team_id:id});
+ if(error){$('status').textContent='Gagal memuat anggota: '+error.message;return}
+ const rows=people||[];
+ $('members').innerHTML=rows.map(p=>'<tr><td>'+esc(p.username)+'</td><td>'+esc(p.full_name)+'</td><td>'+esc(p.nid)+'</td></tr>').join('');
+ $('status').textContent=rows.length+' anggota pada tim '+teams.find(t=>t.id===id)?.team_code+'. Username mengikuti file PEMBAGIAN TIM.xlsx.';
 }
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 db.auth.getSession().then(({data})=>{if(data.session)admin()});
 </script></body></html>
