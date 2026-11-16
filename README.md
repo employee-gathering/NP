@@ -20,16 +20,16 @@ Implementation target: `employee-gathering/NP`, branch `feature/impostor-hunt` (
 - `web/food-voucher.html` — participant voucher retrieval fallback.
 - `web/food-voucher-admin.html` — Admin-only voucher scanner, redemption, and summary.
 - `web/staff-verify.html` and `web/user-role-admin.html` — retired notice pages.
-- `db/202611160001_cih_simplified_flow.sql` — database migration; contains QR token hashes but no NID roster.
+- `202611160001_cih_simplified_flow.sql` — database migration provided as a separate download alongside this package; contains QR token hashes but no NID roster. It has not been applied to Supabase.
 - `db/PRIVATE_import_TIM_NID_assignments.sql` — private import generated from `PEMBAGIAN TIM.xlsx`; contains NID values and password hashes inputs. Do not commit this file to a public repository.
 - `CIH_QR_Player_Bersama.zip` — original QR master archive.
 
 ## Apply order
 
 1. Take a Supabase database backup.
-2. Run `db/202611160001_cih_simplified_flow.sql` in Supabase SQL Editor as the database owner. The migration preserves existing progress, submissions, and voucher rows. It retires old player QR records, installs the master player QR hashes, keeps existing ride QR records, backfills team-to-player pairings, and replaces old role checks with the Admin allow-list.
-3. Run `db/PRIVATE_import_TIM_NID_assignments.sql` in Supabase SQL Editor. This validates 443 workbook rows against active attendees and existing teams before it updates batch/team membership and participant login accounts. It aborts on mismatches, duplicate NIDs, an existing successful submission, or existing vouchers.
-4. Deploy the `web/` files to the `feature/impostor-hunt` branch / GitHub Pages target. Keep the private import SQL out of GitHub.
+2. Run the downloaded `202611160001_cih_simplified_flow.sql` in Supabase SQL Editor as the database owner. The migration preserves existing progress, submissions, and voucher rows. It retires old player QR records, installs the master player QR hashes, keeps existing ride QR records, backfills team-to-player pairings, and replaces old role checks with the Admin allow-list.
+3. Run the private `PRIVATE_import_TIM_NID_assignments.sql` in Supabase SQL Editor. This validates 443 workbook rows against active attendees and existing teams before it updates batch/team membership and participant login accounts. It aborts on mismatches, duplicate NIDs, an existing successful submission, or existing vouchers.
+4. The updated frontend pages are committed to `feature/impostor-hunt` in the existing draft PR. Deploy/merge only after both SQL scripts succeed and UAT is signed off. Keep the private import SQL out of GitHub.
 5. UAT both batches: one login each, shared player QR scan, existing ride QR scan, six letters, one submission, voucher generation for all members, and Admin redemption including duplicate-redemption rejection.
 
 ## Data and safety notes
