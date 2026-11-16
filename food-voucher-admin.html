@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Voucher Makan — CIH</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;padding:18px;color:#222}
+main{max-width:650px;margin:auto}.card{background:white;padding:20px;border-radius:12px;margin:14px 0;box-shadow:0 2px 8px #0001}
+h1{font-size:23px}input,button,select{box-sizing:border-box;width:100%;padding:13px;margin:7px 0;border:1px solid #ccc;border-radius:8px;font-size:16px}
+button{background:#155eef;color:white;border:0;font-weight:bold;cursor:pointer}button.secondary{background:#555}button:disabled{opacity:.5}
+.muted{color:#666;font-size:13px}.result{padding:14px;border-radius:8px;background:#eee;margin-top:12px;overflow-wrap:anywhere;white-space:pre-line}
+.good{background:#dcfce7;color:#166534}.bad{background:#fee2e2;color:#991b1b}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:#f1f5f9;padding:14px 5px;text-align:center;border-radius:8px}.stat strong{display:block;font-size:24px}.hidden{display:none!important}
+</style></head><body><main>
+<h1>Admin Voucher Makan</h1><p class="muted">Login menggunakan akun Admin Employee Gathering.</p>
+<section class="card" id="loginBox"><input id="email" type="email" placeholder="Email Admin"><input id="password" type="password" placeholder="Password Admin">
+<button id="loginBtn">Login</button><div id="loginMsg" class="result hidden"></div></section>
+<section id="app" class="hidden">
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><strong id="userEmail"></strong><button class="secondary" style="width:auto" id="logoutBtn">Keluar</button></div></div>
+<div class="card"><h3>Scan QR Voucher</h3><div id="reader"></div><p class="muted">Arahkan kamera ke QR voucher peserta.</p>
+<button id="startBtn">Buka Kamera</button><button class="secondary" id="stopBtn">Tutup Kamera</button><hr>
+<h4>Input token manual</h4><input id="manualToken" placeholder="Tempel token voucher di sini"><button id="redeemBtn">Periksa dan Tukarkan</button><div id="scanResult" class="result hidden"></div></div>
+<div class="card"><h3>Rekap Voucher</h3><select id="batchSelect"><option value="">Pilih batch</option></select>
+<div class="stats"><div class="stat">Total<strong id="total">-</strong></div><div class="stat">Aktif<strong id="active">-</strong></div><div class="stat">Ditukar<strong id="redeemed">-</strong></div></div>
+<button class="secondary" id="summaryBtn">Perbarui Rekap</button></div>
+</section></main>
+<script>
+const db=supabase.createClient('https://mnxnyasnmtgkmlhcqhys.supabase.co','sb_publishable_ZyLReVa5vQSf8uKvgj1kaA_ZN1oInWT'),$=id=>document.getElementById(id);
+let scanner=null,scanning=false,sessions=[];
+function show(id,text,good=false){const e=$(id);e.textContent=text;e.className='result '+(good?'good':'bad');e.classList.remove('hidden')}
+async function rpc(name,args){const {data,error}=await db.rpc(name,args);if(error)throw error;return data}
+async function checkAdmin(){
+ const {data:{user}}=await db.auth.getUser();
+ if(!user){$('loginBox').classList.remove('hidden');$('app').classList.add('hidden');return}
+ const {data,error}=await db.rpc('ih_is_admin');
+ if(error||data!==true){await db.auth.signOut();$('loginBox').classList.remove('hidden');$('app').classList.add('hidden');show('loginMsg',error?error.message:'Akun ini bukan Admin.');return}
+ $('loginBox').classList.add('hidden');$('app').classList.remove('hidden');$('userEmail').textContent=user.email+' · Admin';await loadSessions();
+}
+async function loadSessions(){
+ const {data,error}=await db.from('ih_game_sessions').select('id,batch_code').order('batch_code');
+ if(error){show('scanResult','Gagal memuat batch: '+error.message);return}
+ sessions=data||[];$('batchSelect').innerHTML='<option value="">Pilih batch</option>'+sessions.map(s=>'<option value="'+s.id+'">'+s.batch_code+'</option>').join('');
+}
+$('loginBtn').onclick=async()=>{
+ $('loginBtn').disabled=true;
+ const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+ $('loginBtn').disabled=false;if(error){show('loginMsg',error.message);return}await checkAdmin();
+};
+$('logoutBtn').onclick=async()=>{await stopScanner();await db.auth.signOut();location.reload()};
+async function startScanner(){
+ if(scanning)return;
+ try{if(!scanner)scanner=new Html5Qrcode('reader');
+ await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:240,height:240}},async text=>{await stopScanner();await redeem(text)},()=>{});scanning=true}
+ catch(e){show('scanResult','Kamera tidak dapat dibuka: '+e.message)}
+}
+async function stopScanner(){if(scanner&&scanning){try{await scanner.stop()}catch(e){}scanning=false}}
+async function redeem(token){
+ token=String(token||'').trim();if(!token){show('scanResult','Token QR kosong.');return}
+ try{
+  const data=await rpc('ih_redeem_food_voucher',{p_token:token});
+  if(data?.ok){show('scanResult','BERHASIL DITUKAR\\nNama: '+data.participant_name+'\\nNID: '+data.nid+'\\nBatch: '+data.batch+'\\nTim: '+data.team_code+'\\nWaktu: '+new Date(data.redeemed_at).toLocaleString('id-ID'),true);$('manualToken').value=''}
+  else show('scanResult',data?.message||'Voucher tidak valid.');
+ }catch(e){show('scanResult','Gagal menukarkan voucher: '+e.message)}
+}
+async function loadSummary(){
+ const id=$('batchSelect').value;if(!id)return;
+ try{const data=await rpc('ih_food_voucher_summary',{p_session_id:id});$('total').textContent=data.total;$('active').textContent=data.active;$('redeemed').textContent=data.redeemed}
+ catch(e){show('scanResult','Gagal memuat rekap: '+e.message)}
+}
+$('startBtn').onclick=startScanner;$('stopBtn').onclick=stopScanner;
+$('redeemBtn').onclick=()=>redeem($('manualToken').value);
+$('summaryBtn').onclick=loadSummary;
+$('batchSelect').onchange=loadSummary;
+db.auth.getSession().then(({data})=>{if(data.session)checkAdmin()});
+</script></body></html>

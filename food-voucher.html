@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voucher Makan — CIH</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5fb;color:#172033;font-family:Arial,sans-serif}main{max-width:520px;margin:auto;padding:18px}
+.card{background:white;border-radius:16px;padding:20px;margin:14px 0;box-shadow:0 3px 15px #0000000d}h1{font-size:24px}h2{font-size:18px;margin:0 0 12px}p{font-size:14px;color:#64748b;line-height:1.5}
+input,button{width:100%;padding:14px;margin:7px 0;border-radius:9px;font-size:16px}input{border:1px solid #cbd5e1}button{background:#155eef;color:white;border:0;font-weight:bold;cursor:pointer}
+.msg{padding:13px;border-radius:9px;background:#eff6ff;color:#1745a5;font-size:14px;line-height:1.5;margin-top:10px}.bad{background:#fee2e2;color:#991b1b}.good{background:#dcfce7;color:#166534}
+.ticket{text-align:center;border:2px dashed #16a34a}#qr{display:flex;justify-content:center;padding:18px}#qr img{max-width:100%;height:auto}.hidden{display:none!important}.muted{color:#64748b;font-size:13px}
+</style></head><body><main>
+<header style="text-align:center;padding:18px 8px"><h1>Voucher Makan</h1><p>CHAOTIC IMPOSTOR HUNT · Employee Gathering 2026</p></header>
+<section class="card" id="loginCard"><h2>Login Peserta</h2><p>Gunakan username TIM dan password NID yang sama dengan login permainan.</p>
+<input id="username" placeholder="Username TIM (contoh: B2-T01-M01)" autocomplete="username"><input id="password" type="password" placeholder="Password NID" autocomplete="current-password">
+<button id="loginBtn">Tampilkan voucher saya</button><div id="message" class="msg hidden"></div></section>
+<section class="card ticket hidden" id="ticket"><h2>VOUCHER MAKAN</h2><div id="qr"></div><strong id="name">—</strong><p id="details"></p><div id="status" class="msg good">VOUCHER AKTIF</div><p class="muted">Tunjukkan QR ini kepada Admin untuk menukarkan makanan. Voucher hanya dapat digunakan satu kali.</p></section>
+</main>
+<script>
+const db=supabase.createClient('https://mnxnyasnmtgkmlhcqhys.supabase.co','sb_publishable_ZyLReVa5vQSf8uKvgj1kaA_ZN1oInWT'),$=id=>document.getElementById(id);
+async function rpc(name,args){const {data,error}=await db.rpc(name,args);if(error)throw error;return data}
+function msg(text,good=false){$('message').textContent=text;$('message').className='msg '+(good?'good':'bad');$('message').classList.remove('hidden')}
+async function showVoucher(token){
+ const data=await rpc('ih_get_my_food_voucher',{p_login_token:token});
+ if(!data?.ok)throw new Error(data?.message||'Voucher belum tersedia.');
+ $('qr').innerHTML='';new QRCode($('qr'),{text:data.token,width:230,height:230,correctLevel:QRCode.CorrectLevel.M});
+ $('name').textContent=data.participant_name;
+ $('details').textContent='NID: '+data.nid+' · '+data.batch+' · '+data.team_code;
+ if(data.status==='redeemed'){$('status').textContent='SUDAH DITUKAR pada '+new Date(data.redeemed_at).toLocaleString('id-ID');$('status').className='msg'}
+ else{$('status').textContent='VOUCHER AKTIF';$('status').className='msg good'}
+ $('ticket').classList.remove('hidden');
+}
+$('loginBtn').onclick=async()=>{
+ const username=$('username').value.trim().toUpperCase(),password=$('password').value.trim();
+ $('loginBtn').disabled=true;
+ try{const login=await rpc('ih_participant_login',{p_username:username,p_password:password});if(!login?.ok)throw new Error(login?.message||'Login gagal.');await showVoucher(login.login_token);msg('Voucher berhasil dimuat.',true);$('password').value=''}
+ catch(e){msg(e.message||'Voucher gagal dimuat.');$('ticket').classList.add('hidden')}
+ finally{$('loginBtn').disabled=false}
+};
+</script></body></html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daftar Tim — Admin CIH</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5fb;color:#172033;font-family:Inter,system-ui,Arial,sans-serif}.wrap{max-width:1000px;margin:auto;padding:18px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;margin:14px 0}h1{font-size:24px;margin:0 0 8px}h2{font-size:18px}.muted{color:#64748b;font-size:13px;line-height:1.5}input,select,button{font:inherit;padding:11px;border:1px solid #cbd5e1;border-radius:9px;margin:5px 0}button{background:#155eef;color:white;border:0;font-weight:700;cursor:pointer}.hidden{display:none!important}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.status{background:#eff6ff;padding:12px;border-radius:9px;margin:10px 0}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:480px}td,th{text-align:left;padding:9px;border-bottom:1px solid #e5eaf0;font-size:13px}th{background:#f8fafc}
+</style></head><body><main class="wrap">
+<section id="login" class="card"><h1>Daftar Tim CIH</h1><p class="muted">Login menggunakan akun Admin Employee Gathering.</p><input id="email" type="email" placeholder="Email Admin"><input id="password" type="password" placeholder="Password Admin"><button id="loginBtn">Login</button><p id="loginMsg" class="muted"></p></section>
+<section id="app" class="hidden">
+<div class="row"><div><h1>Daftar Tim CIH</h1><p class="muted" id="who"></p></div><button id="logout">Keluar</button></div>
+<div class="card"><h2>Daftar anggota</h2><div class="row"><select id="batch"></select><select id="team"></select></div><div id="status" class="status">Memuat...</div><div class="tablewrap"><table><thead><tr><th>Username TIM</th><th>Nama peserta</th><th>NID</th></tr></thead><tbody id="members"></tbody></table></div></div>
+</section></main>
+<script>
+const db=supabase.createClient('https://mnxnyasnmtgkmlhcqhys.supabase.co','sb_publishable_ZyLReVa5vQSf8uKvgj1kaA_ZN1oInWT'),$=id=>document.getElementById(id);
+let sessions=[],teams=[];
+async function admin(){
+ const {data:{user}}=await db.auth.getUser();if(!user)return false;
+ const {data,error}=await db.rpc('ih_is_admin');if(error||data!==true){await db.auth.signOut();$('loginMsg').textContent=error?.message||'Akses hanya untuk Admin.';return false}
+ $('login').classList.add('hidden');$('app').classList.remove('hidden');$('who').textContent=user.email+' · Admin';
+ await load();return true;
+}
+$('loginBtn').onclick=async()=>{const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){$('loginMsg').textContent=error.message;return}await admin()};
+$('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
+async function load(){
+ const {data,error}=await db.from('ih_game_sessions').select('id,batch_code').order('batch_code');if(error){$('status').textContent=error.message;return}
+ sessions=data||[];$('batch').innerHTML=sessions.map(s=>'<option value="'+s.id+'">'+s.batch_code+'</option>').join('');await loadTeams();
+}
+$('batch').onchange=loadTeams;$('team').onchange=loadMembers;
+async function loadTeams(){
+ const s=sessions.find(x=>x.id===$('batch').value);if(!s)return;
+ const {data,error}=await db.from('ih_teams').select('id,team_code,team_name,team_number').eq('session_id',s.id).order('team_number');
+ if(error){$('status').textContent=error.message;return}
+ teams=data||[];$('team').innerHTML=teams.map(t=>'<option value="'+t.id+'">'+t.team_code+' — '+t.team_name+'</option>').join('');await loadMembers();
+}
+async function loadMembers(){
+ const id=$('team').value;if(!id)return;
+ $('status').textContent='Memuat anggota tim...';
+ const {data:people,error}=await db.rpc('ih_admin_list_team_members',{p_team_id:id});
+ if(error){$('status').textContent='Gagal memuat anggota: '+error.message;return}
+ const rows=people||[];
+ $('members').innerHTML=rows.map(p=>'<tr><td>'+esc(p.username)+'</td><td>'+esc(p.full_name)+'</td><td>'+esc(p.nid)+'</td></tr>').join('');
+ $('status').textContent=rows.length+' anggota pada tim '+teams.find(t=>t.id===id)?.team_code+'. Username mengikuti file PEMBAGIAN TIM.xlsx.';
+}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+db.auth.getSession().then(({data})=>{if(data.session)admin()});
+</script></body></html>

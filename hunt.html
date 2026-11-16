@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CHAOTIC IMPOSTOR HUNT — Employee Gathering</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+:root{font-family:Inter,system-ui,Arial,sans-serif;color:#172033;background:#f3f5fb}*{box-sizing:border-box}body{margin:0}
+.wrap{max-width:650px;margin:auto;padding:16px}.card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:20px;margin:14px 0;box-shadow:0 4px 18px #18243a0a}
+header{text-align:center;padding:18px 0}h1{font-size:24px;margin:8px 0}h2{font-size:18px;margin:0 0 12px}.muted{color:#64748b;font-size:14px;line-height:1.5}
+input,select,button{font:inherit;padding:13px;border:1px solid #cbd5e1;border-radius:10px;width:100%;margin:6px 0}
+button{background:#155eef;color:white;border:0;font-weight:700;cursor:pointer}button.alt{background:#eaf0ff;color:#1745a5}button.stop{background:#64748b}button:disabled{opacity:.48;cursor:not-allowed}
+.hidden{display:none!important}.status{padding:13px;border-radius:12px;background:#eff6ff;color:#1745a5;margin:12px 0;line-height:1.5;overflow-wrap:anywhere}.status.error{background:#fee2e2;color:#991b1b}.status.success{background:#dcfce7;color:#166534}
+.tag{display:inline-block;padding:5px 10px;border-radius:24px;background:#eef2ff;color:#1745a5;font-size:12px;font-weight:700}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}.top button{width:auto;margin:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.tile{padding:12px 8px;border-radius:12px;background:#f8fafc;text-align:center;border:1px solid #e5eaf2}.tile b{display:block;font-size:13px}.tile span{display:block;font-size:24px;color:#155eef;font-weight:800;margin-top:5px}.tile .waiting{font-size:13px;color:#64748b;font-weight:500}
+#reader{width:100%;overflow:hidden;border-radius:12px;margin:12px 0;background:#f1f5f9}.scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.scan-actions button{margin:0}
+.small{font-size:12px;color:#64748b;line-height:1.5}.ticket{text-align:center;border:2px dashed #16a34a}.ticket #voucherQr{display:flex;justify-content:center;padding:18px}.ticket #voucherQr img{max-width:100%;height:auto}.footer{text-align:center;font-size:12px;color:#94a3b8;padding:18px}
+@media(max-width:420px){.wrap{padding:10px}.card{padding:16px}.grid{gap:6px}.tile{padding:10px 3px}}
+</style>
+</head>
+<body><main class="wrap">
+<header><span class="tag">EMPLOYEE GATHERING 2026</span><h1>CHAOTIC IMPOSTOR HUNT</h1><div class="muted">Find the Players. Hunt the Clues. Expose the Impostor.</div></header>
+
+<section class="card" id="login">
+<h2>Login Peserta</h2>
+<p class="muted">Username menggunakan kode TIM dari daftar pembagian tim. Password menggunakan NID.</p>
+<input id="username" placeholder="Username TIM (contoh: B2-T01-M01)" autocomplete="username" autocapitalize="characters">
+<input id="password" type="password" placeholder="Password NID" autocomplete="current-password">
+<button id="loginBtn">Masuk ke permainan</button>
+<div id="loginMsg" class="status hidden" role="alert"></div>
+</section>
+
+<section id="game" class="hidden">
+<div class="card">
+<div class="top"><div><div class="muted">PESERTA</div><strong id="participantName">—</strong><div class="muted" id="participantMeta"></div></div><button class="alt" id="logoutBtn">Keluar</button></div>
+<div id="notice" class="status">Memuat progres...</div>
+</div>
+
+<div class="card" id="scannerCard">
+<h2>Scan QR Pemain / Wahana</h2>
+<p class="muted">Scan QR pemain untuk melihat wahana tujuan. Setelah selesai bermain, scan QR wahana untuk mendapatkan huruf.</p>
+<div id="reader"></div>
+<div class="scan-actions"><button id="startScan">Buka Kamera</button><button id="stopScan" class="stop" disabled>Tutup Kamera</button></div>
+<div id="cameraMsg" class="status">Kamera belum dibuka.</div>
+<p class="small">Tidak diperlukan konfirmasi petugas. QR wahana yang sesuai akan langsung menambahkan huruf ke progres tim.</p>
+</div>
+
+<div class="card"><h2>Progres 6 Warna</h2><div class="grid" id="progress"></div><p id="progressSummary" class="muted"></p></div>
+
+<div class="card" id="answerCard">
+<h2>Kirim Jawaban Akhir</h2>
+<p class="muted">Setelah keenam huruf terkumpul, susun nama hewan 5 huruf dan pilih warna impostor.</p>
+<input id="animal" placeholder="Nama hewan (5 huruf)" maxlength="5" autocapitalize="characters">
+<select id="impostor"><option value="">Pilih warna impostor</option><option>RED</option><option>BLUE</option><option>GREEN</option><option>YELLOW</option><option>PURPLE</option><option>ORANGE</option></select>
+<button id="submitBtn" disabled>Kirim jawaban dan terbitkan voucher</button>
+<div id="answerMsg" class="status hidden"></div>
+</div>
+
+<section class="card ticket hidden" id="voucherCard">
+<span class="tag">VOUCHER MAKAN</span><h2>Voucher makanan peserta</h2>
+<p class="muted">Tunjukkan QR ini kepada Admin untuk menukarkan makanan. Setiap voucher hanya dapat digunakan satu kali.</p>
+<div id="voucherQr"></div>
+<strong id="voucherParticipant">—</strong>
+<p class="muted" id="voucherDetails"></p>
+<div id="voucherStatus" class="status success">VOUCHER AKTIF</div>
+</section>
+
+<div class="card"><h2>Cara bermain</h2><ol class="muted"><li>Scan QR pemain berkostum untuk mendapatkan wahana tujuan.</li><li>Mainkan wahana tersebut.</li><li>Scan QR wahana untuk mendapatkan huruf warna.</li><li>Ulangi sampai enam huruf terkumpul.</li><li>Kirim jawaban akhir. Voucher makanan diterbitkan untuk seluruh anggota tim.</li></ol></div>
+</section>
+<div class="footer">Employee Gathering · CHAOTIC IMPOSTOR HUNT</div>
+</main>
+<script>
+const db=supabase.createClient('https://mnxnyasnmtgkmlhcqhys.supabase.co','sb_publishable_ZyLReVa5vQSf8uKvgj1kaA_ZN1oInWT');
+const $=id=>document.getElementById(id);
+const colors=['RED','BLUE','GREEN','YELLOW','PURPLE','ORANGE'];
+let loginToken=localStorage.getItem('cih_login_token')||'';
+let userInfo=null;try{userInfo=JSON.parse(localStorage.getItem('cih_user_info')||'null')}catch(e){}
+let scanner=null,scannerRunning=false,processing=false,restartTimer=null,refreshTimer=null,sessionStatus='';
+
+function setStatus(id,msg,type='info'){const e=$(id);e.textContent=msg;e.className='status'+(type==='error'?' error':type==='success'?' success':'')}
+function showGame(on){$('login').classList.toggle('hidden',on);$('game').classList.toggle('hidden',!on)}
+async function rpc(name,args){const {data,error}=await db.rpc(name,args);if(error)throw error;return data}
+function extractToken(raw){
+ const value=String(raw||'').trim();
+ try{const u=new URL(value);const q=u.searchParams.get('qr');if(q)return q.trim()}catch(e){}
+ return value;
+}
+async function stopScanner(){
+ if(restartTimer){clearTimeout(restartTimer);restartTimer=null}
+ if(scanner&&scannerRunning){try{await scanner.stop()}catch(e){}scannerRunning=false}
+ $('stopScan').disabled=true;$('startScan').disabled=sessionStatus!=='running';
+}
+async function startScanner(){
+ if(scannerRunning||processing)return;
+ if(sessionStatus!=='running'){setStatus('cameraMsg','Permainan belum berjalan.');return}
+ if(!navigator.onLine){setStatus('cameraMsg','Tidak ada koneksi internet.','error');return}
+ try{
+  if(!scanner)scanner=new Html5Qrcode('reader');
+  $('startScan').disabled=true;setStatus('cameraMsg','Meminta izin kamera belakang...');
+  await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:240,height:240},aspectRatio:1},onQrDetected,()=>{});
+  scannerRunning=true;$('stopScan').disabled=false;
+  setStatus('cameraMsg','Kamera aktif. Scan QR pemain atau wahana.','success');
+ }catch(e){
+  scannerRunning=false;try{if(scanner)await scanner.clear()}catch(x){}scanner=null;
+  $('startScan').disabled=false;setStatus('cameraMsg','Kamera gagal dibuka: '+(e.message||e),'error');
+ }
+}
+async function onQrDetected(decodedText){
+ if(processing)return;processing=true;await stopScanner();
+ try{
+  const token=extractToken(decodedText);
+  const result=await rpc('ih_scan_qr',{p_login_token:loginToken,p_token:token});
+  setStatus('cameraMsg',result?.message||'QR diproses.',result?.ok?'success':'error');
+  await refresh();
+  if(result?.code==='player_ok')setStatus('notice','Warna '+result.color_code+': cari wahana '+result.ride_name+'.','success');
+  else if(result?.code==='ride_ok')setStatus('notice','Berhasil! Huruf '+result.letter+' untuk warna '+result.color_code+' sudah didapat.','success');
+  else setStatus('notice',result?.message||'QR tidak dapat diproses.',result?.ok===false?'error':'info');
+ }catch(e){
+  setStatus('notice',e.message||'Gagal memproses QR.','error');
+  setStatus('cameraMsg',e.message||'Gagal memproses QR.','error');
+ }finally{
+  processing=false;
+  if(sessionStatus==='running'){restartTimer=setTimeout(()=>startScanner(),1800)}
+ }
+}
+async function showVoucher(){
+ const v=await rpc('ih_get_my_food_voucher',{p_login_token:loginToken});
+ if(!v?.ok){$('voucherCard').classList.add('hidden');return}
+ $('voucherQr').innerHTML='';
+ new QRCode($('voucherQr'),{text:v.token,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
+ $('voucherParticipant').textContent=v.participant_name;
+ $('voucherDetails').textContent='NID: '+v.nid+' · '+v.batch+' · '+v.team_code;
+ if(v.status==='redeemed'){
+  setStatus('voucherStatus','SUDAH DITUKAR pada '+new Date(v.redeemed_at).toLocaleString('id-ID'),'info');
+ }else setStatus('voucherStatus','VOUCHER AKTIF','success');
+ $('voucherCard').classList.remove('hidden');
+}
+async function refresh(){
+ if(!loginToken)return;
+ const state=await rpc('ih_get_team_state',{p_login_token:loginToken});
+ if(!state?.ok){
+  loginToken='';localStorage.removeItem('cih_login_token');localStorage.removeItem('cih_user_info');
+  showGame(false);setStatus('loginMsg',state?.message||'Silakan login kembali.','error');$('loginMsg').classList.remove('hidden');return;
+ }
+ userInfo=state;sessionStatus=state.session_status;
+ $('participantName').textContent=state.participant_name;
+ $('participantMeta').textContent=state.username+' · '+state.team_code+' · '+state.batch_code;
+ const progress=state.progress||[];
+ const done=progress.filter(p=>p.status==='letter_found').length;
+ $('progress').innerHTML=colors.map(c=>{
+  const p=progress.find(x=>x.color_code===c)||{};
+  return '<div class="tile"><b>'+c+'</b><span>'+(p.status==='letter_found'?String(p.letter||'✓'):'<span class="waiting">Belum</span>')+'</span></div>';
+ }).join('');
+ $('progressSummary').textContent=done+' dari 6 huruf sudah terkumpul.';
+ $('submitBtn').disabled=done!==6||sessionStatus!=='running'||!!state.has_submitted;
+ if(state.has_submitted){
+  $('submitBtn').disabled=true;
+  setStatus('answerMsg','Jawaban akhir sudah tercatat untuk tim ini.','success');$('answerMsg').classList.remove('hidden');
+  await showVoucher();
+ }
+ if(sessionStatus!=='running'){
+  $('startScan').disabled=true;if(scannerRunning)await stopScanner();
+  setStatus('cameraMsg','Permainan belum berjalan atau sudah selesai.');
+ }else $('startScan').disabled=false;
+ setStatus('notice',sessionStatus==='running'?'Permainan berlangsung. Scan QR pemain untuk membuka tujuan wahana.':'Status permainan: '+sessionStatus);
+}
+async function login(){
+ const username=$('username').value.trim().toUpperCase(),password=$('password').value.trim();
+ if(!username||!password){setStatus('loginMsg','Masukkan username TIM dan password NID.','error');$('loginMsg').classList.remove('hidden');return}
+ $('loginBtn').disabled=true;setStatus('loginMsg','Memeriksa username dan NID...');
+ try{
+  const result=await rpc('ih_participant_login',{p_username:username,p_password:password});
+  if(!result?.ok)throw new Error(result?.message||'Login gagal.');
+  loginToken=result.login_token;userInfo=result;
+  localStorage.setItem('cih_login_token',loginToken);localStorage.setItem('cih_user_info',JSON.stringify(result));
+  $('password').value='';$('loginMsg').classList.add('hidden');showGame(true);
+  await refresh();
+  if(result.session_status==='running'&&!refreshTimer)refreshTimer=setInterval(()=>refresh().catch(()=>{}),10000);
+  if(result.session_status==='running')await startScanner();
+ }catch(e){setStatus('loginMsg',e.message||'Login gagal.','error');$('loginMsg').classList.remove('hidden')}
+ finally{$('loginBtn').disabled=false}
+}
+$('loginBtn').onclick=login;
+$('username').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+$('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+$('startScan').onclick=startScanner;$('stopScan').onclick=stopScanner;
+$('logoutBtn').onclick=async()=>{
+ await stopScanner();loginToken='';userInfo=null;localStorage.removeItem('cih_login_token');localStorage.removeItem('cih_user_info');
+ if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null}showGame(false);$('username').value='';$('password').value='';
+};
+$('submitBtn').onclick=async()=>{
+ const answer=$('animal').value.trim().toUpperCase(),color=$('impostor').value;
+ if(answer.length!==5||!color){setStatus('answerMsg','Isi nama hewan 5 huruf dan pilih warna impostor.','error');$('answerMsg').classList.remove('hidden');return}
+ $('submitBtn').disabled=true;setStatus('answerMsg','Mengirim jawaban dan menerbitkan voucher...');
+ $('answerMsg').classList.remove('hidden');
+ try{
+  const result=await rpc('ih_submit_answer',{p_login_token:loginToken,p_animal_answer:answer,p_impostor_color_code:color});
+  setStatus('answerMsg',result?.message||'Jawaban sudah dikirim.',result?.correct?'success':'info');
+  await refresh();await showVoucher();
+ }catch(e){setStatus('answerMsg','Gagal mengirim: '+e.message,'error');await refresh().catch(()=>{})}
+};
+if(loginToken){showGame(true);refresh().then(()=>{if(sessionStatus==='running'&&!refreshTimer)refreshTimer=setInterval(()=>refresh().catch(()=>{}),10000)}).catch(e=>{showGame(false);setStatus('loginMsg',e.message,'error');$('loginMsg').classList.remove('hidden')})}
+else showGame(false);
+window.addEventListener('offline',()=>{stopScanner();setStatus('cameraMsg','Koneksi internet terputus.','error')});
+window.addEventListener('online',()=>setStatus('cameraMsg','Koneksi kembali. Tekan Buka Kamera untuk melanjutkan.'));
+</script></body></html>

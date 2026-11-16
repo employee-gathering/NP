@@ -1,17 +1,40 @@
-# Employee Gathering — GitHub Pages
+# CHAOTIC IMPOSTOR HUNT — Simplified Flow
 
-Frontend statis untuk mengelola peserta melalui Supabase. Tidak menyertakan data peserta atau kredensial rahasia.
+Implementation target: `employee-gathering/NP`, branch `feature/impostor-hunt` (keep the existing PR in draft; do not merge to `main` before UAT sign-off).
 
-## Deploy
-1. Upload `index.html` ke root repository `employee-gathering.github.io`.
-2. Repository Settings → Pages → Deploy from a branch → `main` → `/ (root)` → Save.
-3. Buka `https://employee-gathering.github.io/`.
-4. Masukkan Supabase Project URL dan Publishable Key pada layar konfigurasi.
-5. Login menggunakan akun Supabase Auth yang UUID-nya terdaftar di `public.admin_users`.
+## What changed
 
-## Catatan penting
-- Frontend menggunakan tabel `public.attendees` dengan kolom `id`, `nid`, `full_name`, `batch`, `vehicle`, `notes`, `active`, serta tabel `public.admin_users` dengan kolom `user_id`.
-- Pastikan RLS dan policies membatasi semua operasi peserta hanya untuk admin terdaftar.
-- Batas 500 peserta wajib ditegakkan di database dengan constraint/trigger, bukan hanya validasi browser.
-- Publishable Key boleh digunakan di browser; jangan pernah memasukkan `sb_secret_` atau `service_role` ke repository.
-- File CSV peserta berisi data pribadi; jangan commit ke repository publik.
+- Participant username is the complete `TIM` code from `PEMBAGIAN TIM.xlsx` (for example `B2-T01-M01`); password is the participant's NID.
+- Each participant has an individual login, while all members of the parent team (for example `B2-T01`) share the same six-color progress and one final submission.
+- The 18 master player QR PNGs from `CIH_QR_Player_Bersama.zip` are displayed on the Admin page and shared by both batches. Old per-batch player QR rows are deactivated. Existing ride QR rows are retained and remain batch-specific.
+- Player QR scanning returns the ride assigned to that player's slot for the participant's batch/team. Scanning the correct ride QR adds the letter immediately; no staff verification step is used.
+- After six letters are collected, the team can submit once. A voucher is generated for each active team member after submission whether the submitted answer is right or wrong, as required by the event rule.
+- A voucher can be redeemed once by an account listed in `public.admin_users`.
+- App-specific assignments in `public.app_user_roles` are cleared; administrative access is based on `public.admin_users` only.
+
+## Files
+
+- `web/hunt.html` — participant TIM + NID login, QR scan, team progress, final submit, and personal voucher display.
+- `web/hunt-admin.html` — Admin-only batch start and the 18 exact master player QR images.
+- `web/team-admin.html` — Admin-only team roster viewer with exact TIM codes.
+- `web/food-voucher.html` — participant voucher retrieval fallback.
+- `web/food-voucher-admin.html` — Admin-only voucher scanner, redemption, and summary.
+- `web/staff-verify.html` and `web/user-role-admin.html` — retired notice pages.
+- `202611160001_cih_simplified_flow.sql` — database migration provided as a separate download alongside this package; contains QR token hashes but no NID roster. It has not been applied to Supabase.
+- `db/PRIVATE_import_TIM_NID_assignments.sql` — private import generated from `PEMBAGIAN TIM.xlsx`; contains NID values and password hashes inputs. Do not commit this file to a public repository.
+- `CIH_QR_Player_Bersama.zip` — original QR master archive.
+
+## Apply order
+
+1. Take a Supabase database backup.
+2. Run the downloaded `202611160001_cih_simplified_flow.sql` in Supabase SQL Editor as the database owner. The migration preserves existing progress, submissions, and voucher rows. It retires old player QR records, installs the master player QR hashes, keeps existing ride QR records, backfills team-to-player pairings, and replaces old role checks with the Admin allow-list.
+3. Run the private `PRIVATE_import_TIM_NID_assignments.sql` in Supabase SQL Editor. This validates 443 workbook rows against active attendees and existing teams before it updates batch/team membership and participant login accounts. It aborts on mismatches, duplicate NIDs, an existing successful submission, or existing vouchers.
+4. The updated frontend pages are committed to `feature/impostor-hunt` in the existing draft PR. Deploy/merge only after both SQL scripts succeed and UAT is signed off. Keep the private import SQL out of GitHub.
+5. UAT both batches: one login each, shared player QR scan, existing ride QR scan, six letters, one submission, voucher generation for all members, and Admin redemption including duplicate-redemption rejection.
+
+## Data and safety notes
+
+- The import is private because it contains NID values. NIDs are stored as bcrypt hashes in `ih_participant_accounts`; the existing attendee table continues to contain its current NID field.
+- The import uses the workbook's 443 entries as the source of truth for participant team/batch assignment. It does not delete attendees.
+- No UAT progress is reset by either SQL script. In particular, do not reset B2-T01 until the remaining UAT has finished and the user explicitly requests the cleanup.
+- Database changes are not applied automatically from this package; the two SQL files must be run in Supabase.
